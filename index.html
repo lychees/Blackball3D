@@ -3,14 +3,250 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#101b17" />
-    <meta name="description" content="Aster Vale — an original Heroes of Might and Magic III-inspired 3D adventure with towns, heroes, and tactical battles." />
-    <title>Aster Vale — Fantasy Strategy Adventure</title>
+    <meta name="theme-color" content="#0b100e" />
+    <meta name="description" content="Blackball — a refined 3D billiards game for the browser. Aim, add spin, and outplay the CPU or a friend." />
+    <title>Blackball — 3D Billiards Club</title>
     <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.js"
+        }
+      }
+    </script>
   </head>
   <body>
-    <div id="app"></div>
-    <noscript>Aster Vale requires JavaScript to run.</noscript>
-    <script type="module" src="/src/main.ts"></script>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Blackball 3D Billiards">
+          <div class="brand-ball" aria-hidden="true"><span>8</span></div>
+          <div class="brand-copy">
+            <div class="brand-name">BLACKBALL<span>3D</span></div>
+            <p>THE MODERN POOL CLUB</p>
+          </div>
+        </div>
+        <div class="topbar-meta">
+          <span class="live-badge"><i aria-hidden="true"></i> TABLE IS OPEN</span>
+          <span class="edition">NO. 008 / THREE.JS</span>
+        </div>
+      </header>
+
+      <main class="game-layout">
+        <section class="play-column" aria-label="Game table">
+          <div id="table-stage" class="table-stage">
+            <div
+              id="scene-container"
+              class="scene-container"
+              aria-label="Interactive 3D billiards table. Move to aim, hold to charge, and release to shoot."
+            ></div>
+            <div class="table-vignette" aria-hidden="true"></div>
+
+            <div class="table-topline interface-layer">
+              <div class="table-reference">
+                <span class="table-number"><i aria-hidden="true"></i> TABLE 01</span>
+                <span id="shot-counter">SHOT 00</span>
+              </div>
+              <div id="turn-pill" class="turn-pill">
+                <span class="turn-dot" aria-hidden="true"></span>
+                <span id="turn-label">YOUR TURN</span>
+              </div>
+            </div>
+
+            <div class="table-bottomline interface-layer">
+              <div class="aim-hint">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>
+                </svg>
+                <span id="context-hint">Move to aim · Hold to charge</span>
+              </div>
+              <div class="table-shortcut"><kbd>SPACE</kbd><span>HOLD + RELEASE</span></div>
+            </div>
+
+            <div id="loading-screen" class="loading-screen">
+              <div class="loading-ball" aria-hidden="true"><span>8</span></div>
+              <p>RACKING THE TABLE</p>
+              <span>Preparing the cloth…</span>
+            </div>
+
+            <div id="winner-overlay" class="winner-overlay interface-layer" hidden>
+              <div class="winner-card">
+                <span class="eyebrow">MATCH COMPLETE</span>
+                <div class="winner-ball" aria-hidden="true">8</div>
+                <h2 id="winner-title">YOU WIN</h2>
+                <p id="winner-detail">A fine finish at the Blackball club.</p>
+                <button id="winner-restart" class="button button-primary" type="button">
+                  PLAY AGAIN
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div id="fatal-error" class="fatal-error interface-layer" hidden>
+              <strong>THE TABLE COULD NOT OPEN</strong>
+              <p id="fatal-error-message">Please refresh and try again.</p>
+            </div>
+          </div>
+
+          <div class="under-table">
+            <div class="now-message">
+              <span class="message-label">TABLE TALK</span>
+              <p id="game-message" role="status" aria-live="polite">Your break. Line it up and make it count.</p>
+            </div>
+            <span id="foul-badge" class="foul-badge" hidden>FOUL</span>
+          </div>
+        </section>
+
+        <aside class="control-panel" aria-label="Match and shot controls">
+          <section class="panel-section match-section">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">MATCH SETUP</span>
+                <h2>Head to head</h2>
+              </div>
+              <span id="match-type" class="match-type">VS CPU</span>
+            </div>
+
+            <div class="mode-switch" role="group" aria-label="Game mode">
+              <button class="is-active" type="button" data-mode="cpu" aria-pressed="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"></rect><path d="M9 3v4M15 3v4M9 12h.01M15 12h.01M9 15h6"></path></svg>
+                VS CPU
+              </button>
+              <button type="button" data-mode="local" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2M15 14a5 5 0 0 1 6 5v1"></path></svg>
+                2 PLAYERS
+              </button>
+            </div>
+
+            <div class="players">
+              <article id="player-card-0" class="player-card is-active">
+                <div class="player-row">
+                  <span class="player-number">01</span>
+                  <div class="player-identity">
+                    <h3 id="player-name-0">YOU</h3>
+                    <span id="player-type-0">HUMAN</span>
+                  </div>
+                  <span id="player-turn-0" class="turn-chip">AT TABLE</span>
+                </div>
+                <div class="group-row">
+                  <span id="player-group-0">OPEN TABLE</span>
+                  <span id="player-count-0">— / 7</span>
+                </div>
+                <div id="player-rack-0" class="mini-rack" aria-hidden="true"></div>
+              </article>
+
+              <article id="player-card-1" class="player-card player-two">
+                <div class="player-row">
+                  <span class="player-number">02</span>
+                  <div class="player-identity">
+                    <h3 id="player-name-1">CPU</h3>
+                    <span id="player-type-1">CPU OPPONENT</span>
+                  </div>
+                  <span id="player-turn-1" class="turn-chip">WAITING</span>
+                </div>
+                <div class="group-row">
+                  <span id="player-group-1">OPEN TABLE</span>
+                  <span id="player-count-1">— / 7</span>
+                </div>
+                <div id="player-rack-1" class="mini-rack" aria-hidden="true"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel-section shot-section">
+            <div class="section-heading compact-heading">
+              <div>
+                <span class="eyebrow">SHOT CONTROL</span>
+                <h2>Make it count</h2>
+              </div>
+              <span class="control-index">01 / 03</span>
+            </div>
+
+            <div class="power-block">
+              <div class="control-label">
+                <span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"></path></svg>
+                  POWER
+                </span>
+                <output id="power-value">00%</output>
+              </div>
+              <div id="power-meter" class="power-meter" role="progressbar" aria-label="Shot power" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="power-fill"></div>
+                <div class="power-grid" aria-hidden="true"></div>
+              </div>
+              <div class="power-scale"><span>SOFT</span><span>BREAK</span></div>
+            </div>
+
+            <div class="spin-block">
+              <div class="spin-copy">
+                <span class="control-title">SPIN</span>
+                <p id="spin-label">CENTER BALL</p>
+                <button id="spin-reset" type="button">RESET</button>
+              </div>
+              <div
+                id="spin-pad"
+                class="spin-pad"
+                role="slider"
+                tabindex="0"
+                aria-label="Cue ball spin. Use arrow keys to adjust and Home to reset."
+                aria-valuemin="-1"
+                aria-valuemax="1"
+                aria-valuenow="0"
+                aria-valuetext="Center ball"
+              >
+                <span class="spin-direction spin-top">TOP</span>
+                <span class="spin-direction spin-right">R</span>
+                <span class="spin-direction spin-bottom">BACK</span>
+                <span class="spin-direction spin-left">L</span>
+                <div class="spin-ball"><div id="spin-handle"></div></div>
+              </div>
+            </div>
+
+            <button id="shoot-button" class="shoot-button" type="button">
+              <span class="shoot-copy">
+                <strong>HOLD TO SHOOT</strong>
+                <small>RELEASE TO TAKE YOUR SHOT</small>
+              </span>
+              <kbd>SPACE</kbd>
+              <span class="shoot-progress" aria-hidden="true"></span>
+            </button>
+            <p id="shot-status" class="shot-status">Ready when you are.</p>
+          </section>
+
+          <section class="panel-section utility-section">
+            <div class="utility-buttons">
+              <button id="new-game" class="button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"></path><path d="M6.1 8a7 7 0 0 1 11.8-1L20 12M4 12l2.1 5a7 7 0 0 0 11.8-1"></path></svg>
+                NEW RACK
+              </button>
+              <button id="reset-camera" class="button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                RESET VIEW
+              </button>
+            </div>
+
+            <div class="quick-guide">
+              <span class="eyebrow">HOUSE RULES</span>
+              <div class="guide-row"><span>01</span><p><strong>AIM</strong>Move over the table</p></div>
+              <div class="guide-row"><span>02</span><p><strong>STRIKE</strong>Hold, then release</p></div>
+              <div class="guide-row"><span>03</span><p><strong>LOOK AROUND</strong>Right-drag · Scroll</p></div>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer">
+        <span>BLACKBALL BILLIARDS · BROWSER EDITION</span>
+        <span class="footer-tip"><i aria-hidden="true"></i> SOLIDS OR STRIPES. THEN THE EIGHT.</span>
+        <span>EST. 2026 / 8-BALL</span>
+      </footer>
+    </div>
+
+    <noscript><div class="noscript">JavaScript is required to open the Blackball table.</div></noscript>
+    <script type="module" src="./src/main.js"></script>
   </body>
 </html>

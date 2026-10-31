@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b100e" />
-    <meta name="description" content="Blackball — a refined 3D billiards game for the browser. Aim, add spin, and outplay the CPU or a friend." />
+    <meta name="description" content="Blackball — refined 3D 8-ball, 9-ball, and snooker for the browser. Aim, add spin, and outplay the CPU or a friend." />
     <title>Blackball — 3D Billiards Club</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./src/style.css" />
@@ -20,7 +20,7 @@
     <div class="ambient ambient-one" aria-hidden="true"></div>
     <div class="ambient ambient-two" aria-hidden="true"></div>
 
-    <div id="app" class="app-shell">
+    <div id="app" class="app-shell" data-variant="eightball">
       <header class="topbar">
         <div class="brand" aria-label="Blackball 3D Billiards">
           <div class="brand-ball" aria-hidden="true"><span>8</span></div>
@@ -76,7 +76,7 @@
             <div id="winner-overlay" class="winner-overlay interface-layer" hidden>
               <div class="winner-card">
                 <span class="eyebrow">MATCH COMPLETE</span>
-                <div class="winner-ball" aria-hidden="true">8</div>
+                <div id="winner-ball" class="winner-ball" aria-hidden="true">8</div>
                 <h2 id="winner-title">YOU WIN</h2>
                 <p id="winner-detail">A fine finish at the Blackball club.</p>
                 <button id="winner-restart" class="button button-primary" type="button">
@@ -108,10 +108,10 @@
                 <span class="eyebrow">MATCH SETUP</span>
                 <h2>Head to head</h2>
               </div>
-              <span id="match-type" class="match-type">VS CPU</span>
+              <span id="match-type" class="match-type">8-BALL · VS CPU</span>
             </div>
 
-            <div class="mode-switch" role="group" aria-label="Game mode">
+            <div class="mode-switch" role="group" aria-label="Opponent mode">
               <button class="is-active" type="button" data-mode="cpu" aria-pressed="true">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"></rect><path d="M9 3v4M15 3v4M9 12h.01M15 12h.01M9 15h6"></path></svg>
                 VS CPU
@@ -120,6 +120,35 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2M15 14a5 5 0 0 1 6 5v1"></path></svg>
                 2 PLAYERS
               </button>
+            </div>
+
+            <div class="variant-picker">
+              <div class="variant-picker-heading">
+                <span class="control-title">GAME TYPE</span>
+                <span>NEW GAME ON CHANGE</span>
+              </div>
+              <div class="variant-switch" role="group" aria-label="Game type">
+                <button class="is-active" type="button" data-variant="eightball" aria-pressed="true">
+                  <span class="variant-ball" aria-hidden="true">8</span>
+                  <span>8-BALL</span>
+                </button>
+                <button type="button" data-variant="nineball" aria-pressed="false">
+                  <span class="variant-ball" aria-hidden="true">9</span>
+                  <span>9-BALL</span>
+                </button>
+                <button type="button" data-variant="snooker" aria-pressed="false">
+                  <span class="variant-ball variant-ball-snooker" aria-hidden="true">S</span>
+                  <span>SNOOKER</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="variant-status" class="variant-status" hidden>
+              <div class="variant-target-copy">
+                <span id="target-caption">LOWEST BALL FIRST</span>
+                <strong id="target-label">1 BALL</strong>
+              </div>
+              <span id="target-detail">Hit the lowest numbered ball first.</span>
             </div>
 
             <div class="players">
@@ -221,7 +250,7 @@
             <div class="utility-buttons">
               <button id="new-game" class="button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"></path><path d="M6.1 8a7 7 0 0 1 11.8-1L20 12M4 12l2.1 5a7 7 0 0 0 11.8-1"></path></svg>
-                NEW RACK
+                NEW GAME
               </button>
               <button id="reset-camera" class="button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -234,6 +263,7 @@
               <div class="guide-row"><span>01</span><p><strong>AIM</strong>Move over the table</p></div>
               <div class="guide-row"><span>02</span><p><strong>STRIKE</strong>Hold, then release</p></div>
               <div class="guide-row"><span>03</span><p><strong>LOOK AROUND</strong>Right-drag · Scroll</p></div>
+              <div class="guide-row"><span>04</span><p><strong id="guide-rule-title">8-BALL RULE</strong><span id="guide-rule-copy">Clear your group, then the 8</span></p></div>
             </div>
           </section>
         </aside>
@@ -241,8 +271,8 @@
 
       <footer class="footer">
         <span>BLACKBALL BILLIARDS · BROWSER EDITION</span>
-        <span class="footer-tip"><i aria-hidden="true"></i> SOLIDS OR STRIPES. THEN THE EIGHT.</span>
-        <span>EST. 2026 / 8-BALL</span>
+        <span class="footer-tip"><i aria-hidden="true"></i><span id="footer-rule">SOLIDS OR STRIPES. THEN THE EIGHT.</span></span>
+        <span id="footer-variant">EST. 2026 / 8-BALL</span>
       </footer>
     </div>
 

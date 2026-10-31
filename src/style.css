@@ -533,6 +533,138 @@ kbd {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 
+.variant-picker {
+  margin-top: 15px;
+}
+
+.variant-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.variant-picker-heading > span:last-child {
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 0.07em;
+}
+
+.variant-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.variant-switch button {
+  min-width: 0;
+  min-height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.018);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.variant-switch button:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.variant-switch button.is-active {
+  color: var(--accent);
+  border-color: rgba(214, 251, 112, 0.42);
+  background: rgba(214, 251, 112, 0.075);
+  box-shadow: inset 0 0 0 1px rgba(214, 251, 112, 0.035);
+}
+
+.variant-ball {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  color: #dce4dc;
+  background: #202923;
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.variant-switch button.is-active .variant-ball {
+  color: var(--accent-dark);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.variant-switch button .variant-ball-snooker {
+  color: #fff2e9;
+  border-color: #a64c40;
+  background: #8e3e34;
+  font-size: 7px;
+}
+
+.variant-switch button.is-active .variant-ball-snooker {
+  color: #fff8f1;
+  border-color: #d66d5c;
+  background: #b85143;
+}
+
+.variant-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(214, 251, 112, 0.13);
+  border-radius: 7px;
+  background: linear-gradient(105deg, rgba(214, 251, 112, 0.045), rgba(255, 255, 255, 0.012));
+}
+
+.variant-target-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+#target-caption {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 0.12em;
+}
+
+#target-label {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+#target-detail {
+  max-width: 116px;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 6px;
+  line-height: 1.6;
+  text-align: right;
+}
+
 .players {
   display: grid;
   gap: 8px;
@@ -662,6 +794,36 @@ kbd {
 #player-count-1 {
   color: var(--dim);
   letter-spacing: 0;
+}
+
+.player-card.is-compact .group-row,
+.player-card.is-compact .mini-rack,
+.player-card.is-score .mini-rack {
+  display: none;
+}
+
+.player-card.is-score .group-row {
+  align-items: flex-end;
+  margin-bottom: 1px;
+}
+
+.player-card.is-score #player-count-0,
+.player-card.is-score #player-count-1 {
+  color: #e6ede5;
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.player-card.is-score.is-active #player-count-0,
+.player-card.is-score.is-active #player-count-1 {
+  color: var(--accent);
+}
+
+.player-card.player-two.is-score.is-active #player-count-1 {
+  color: var(--coral);
 }
 
 .mini-rack {
@@ -1215,6 +1377,20 @@ kbd {
   box-shadow: 0 0 35px rgba(214, 251, 112, 0.12);
 }
 
+.app-shell[data-variant="snooker"] .winner-ball:not(.is-tie) {
+  color: #fff5ed;
+  border-color: #59352e;
+  background: #b85143;
+  box-shadow: 0 0 35px rgba(184, 81, 67, 0.16);
+}
+
+.winner-ball.is-tie {
+  color: #c3cec5;
+  border-color: #3b4640;
+  background: #27312b;
+  box-shadow: none;
+}
+
 .winner-card h2 {
   margin: 0 0 10px;
   font-size: 27px;
@@ -1288,7 +1464,7 @@ kbd {
     gap: 30px;
     border-top: 1px solid var(--line) !important;
   }
-  .quick-guide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; }
+  .quick-guide { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 0; }
   .quick-guide > .eyebrow { grid-column: 1 / -1; margin-bottom: 0; }
   .guide-row { align-items: flex-start; }
   .guide-row p { line-height: 1.6; }

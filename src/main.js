@@ -9,6 +9,7 @@ const chargeDuration = 1400;
 let game;
 let view;
 let currentMode = "cpu";
+let currentVariant = "eightball";
 let charging = false;
 let chargeSource = null;
 let chargeStartedAt = 0;
@@ -22,6 +23,12 @@ const ui = createUI({
     if (mode !== "cpu" && mode !== "local") return;
     if (mode === currentMode) return;
     currentMode = mode;
+    resetMatch();
+  },
+  onVariant(variant) {
+    if (!["eightball", "nineball", "snooker"].includes(variant)) return;
+    if (variant === currentVariant) return;
+    currentVariant = variant;
     resetMatch();
   },
   onNewGame: resetMatch,
@@ -116,7 +123,7 @@ function cancelCharge(source) {
 function resetMatch() {
   if (!game) return;
   cancelCharge();
-  game.reset(currentMode);
+  game.reset(currentMode, currentVariant);
 }
 
 container.addEventListener("pointermove", (event) => {
@@ -175,7 +182,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 try {
-  game = createGame({ mode: currentMode });
+  game = createGame({ mode: currentMode, variant: currentVariant });
   view = createTableScene(container, game);
   view.resize();
 } catch (error) {

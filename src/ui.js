@@ -10,6 +10,27 @@ const ballColors = {
   7: "#88453c",
 };
 
+const variantDetails = {
+  eightball: {
+    label: "8-BALL",
+    symbol: "8",
+    guide: "Clear your group, then the 8",
+    footer: "SOLIDS OR STRIPES. THEN THE EIGHT.",
+  },
+  nineball: {
+    label: "9-BALL",
+    symbol: "9",
+    guide: "Hit the lowest ball first",
+    footer: "LOWEST BALL FIRST. POT THE NINE TO WIN.",
+  },
+  snooker: {
+    label: "SNOOKER",
+    symbol: "S",
+    guide: "Red → colour · Then colours in order",
+    footer: "REDS AND COLOURS. HIGHEST SCORE WINS.",
+  },
+};
+
 export function createUI(handlers = {}) {
   const byId = (id) => document.getElementById(id);
   const elements = {
@@ -21,6 +42,14 @@ export function createUI(handlers = {}) {
     message: byId("game-message"),
     foulBadge: byId("foul-badge"),
     matchType: byId("match-type"),
+    variantStatus: byId("variant-status"),
+    targetCaption: byId("target-caption"),
+    targetLabel: byId("target-label"),
+    targetDetail: byId("target-detail"),
+    guideRuleTitle: byId("guide-rule-title"),
+    guideRuleCopy: byId("guide-rule-copy"),
+    footerRule: byId("footer-rule"),
+    footerVariant: byId("footer-variant"),
     powerMeter: byId("power-meter"),
     powerValue: byId("power-value"),
     spinPad: byId("spin-pad"),
@@ -31,6 +60,7 @@ export function createUI(handlers = {}) {
     shotStatus: byId("shot-status"),
     loading: byId("loading-screen"),
     winnerOverlay: byId("winner-overlay"),
+    winnerBall: byId("winner-ball"),
     winnerTitle: byId("winner-title"),
     winnerDetail: byId("winner-detail"),
     fatalError: byId("fatal-error"),
@@ -49,6 +79,7 @@ export function createUI(handlers = {}) {
   }));
 
   const modeButtons = [...document.querySelectorAll("[data-mode]")];
+  const variantButtons = [...document.querySelectorAll("button[data-variant]")];
   let currentSpin = { x: 0, y: 0 };
   let spinPointer = null;
   let shootPointer = null;
@@ -202,6 +233,9 @@ export function createUI(handlers = {}) {
   modeButtons.forEach((button) => {
     button.addEventListener("click", () => handlers.onMode?.(button.dataset.mode));
   });
+  variantButtons.forEach((button) => {
+    button.addEventListener("click", () => handlers.onVariant?.(button.dataset.variant));
+  });
   byId("new-game").addEventListener("click", () => handlers.onNewGame?.());
   byId("winner-restart").addEventListener("click", () => handlers.onNewGame?.());
   byId("reset-camera").addEventListener("click", () => handlers.onCamera?.());
@@ -216,32 +250,79 @@ export function createUI(handlers = {}) {
       const canControl = state.phase === "aiming" && isHuman;
       const charging = Boolean(options.charging);
       const mode = playerStates[1]?.type === "cpu" ? "cpu" : "local";
+      const variant = ["eightball", "nineball", "snooker"].includes(state.variant) ? state.variant : "eightball";
+      const details = variantDetails[variant];
+      const winner = state.winner === 0 || state.winner === 1 ? state.winner : null;
+      const tied = state.phase === "gameover" && (state.tie === true || winner === null);
+      const scores = [0, 1].map((index) => {
+        const score = Number(state.scores?.[index]);
+        return Number.isFinite(score) ? score : 0;
+      });
+      const targetLabel = typeof state.targetLabel === "string" ? state.targetLabel.trim() : "";
       const power = clamp(Number(options.charging ? options.chargePower : state.power) || 0);
       const powerPercent = Math.round(power * 100);
 
       elements.app.dataset.phase = state.phase || "aiming";
       elements.app.dataset.player = String(current);
+      elements.app.dataset.variant = variant;
       elements.app.classList.toggle("is-charging", charging);
       setText(elements.shotCounter, `SHOT ${String(Number(state.shotNumber) || 0).padStart(2, "0")}`);
-      setText(elements.matchType, mode === "cpu" ? "VS CPU" : "LOCAL MATCH");
+      setText(elements.matchType, `${details.label} · ${mode === "cpu" ? "VS CPU" : "LOCAL"}`);
+      setText(elements.guideRuleTitle, `${details.label} RULE`);
+      setText(elements.guideRuleCopy, details.guide);
+      setText(elements.footerRule, details.footer);
+      setText(elements.footerVariant, `EST. 2026 / ${details.label}`);
 
       modeButtons.forEach((button) => {
         const active = button.dataset.mode === mode;
         button.classList.toggle("is-active", active);
         button.setAttribute("aria-pressed", String(active));
       });
+      variantButtons.forEach((button) => {
+        const active = button.dataset.variant === variant;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+
+      elements.variantStatus.hidden = variant === "eightball";
+      if (variant === "nineball") {
+        const numberedBalls = balls
+          .filter((ball) => ball.number >= 1 && ball.number <= 9 && ball.active !== false && !ball.pocketed)
+          .map((ball) => ball.number);
+        const lowestBall = numberedBalls.length > 0 ? Math.min(...numberedBalls) : null;
+        setText(elements.targetCaption, "LOWEST BALL FIRST");
+        setText(elements.targetLabel, targetLabel || (lowestBall === null ? "9-BALL" : `${lowestBall} BALL`));
+        setText(elements.targetDetail, lowestBall === null ? "The 9-ball decides the game." : "Strike this ball before any other.");
+      } else if (variant === "snooker") {
+        setText(elements.targetCaption, "CURRENT SNOOKER TARGET");
+        setText(elements.targetLabel, targetLabel || "RED BALL");
+        setText(elements.targetDetail, "Red ↔ colour · Then yellow to black.");
+      }
 
       playerStates.slice(0, 2).forEach((playerState, index) => {
         const player = players[index];
         const active = current === index && state.phase !== "gameover";
-        const group = playerState.group === "solid" || playerState.group === "stripe" ? playerState.group : null;
+        const group = variant === "eightball" && (playerState.group === "solid" || playerState.group === "stripe")
+          ? playerState.group
+          : null;
         const remaining = remainingBalls(balls, group);
         player.card.classList.toggle("is-active", active);
+        player.card.classList.toggle("is-compact", variant === "nineball");
+        player.card.classList.toggle("is-score", variant === "snooker");
         setText(player.name, playerState.name || (index === 0 ? "YOU" : mode === "cpu" ? "CPU" : "PLAYER 2"));
         setText(player.type, playerState.type === "cpu" ? "CPU OPPONENT" : "HUMAN PLAYER");
-        setText(player.turn, active ? "AT TABLE" : state.phase === "gameover" && state.winner === index ? "WINNER" : "WAITING");
-        setText(player.group, group ? `${group === "solid" ? "SOLIDS" : "STRIPES"} · ${remaining} LEFT` : "OPEN TABLE");
-        setText(player.count, group ? `${7 - remaining} / 7 DOWN` : "— / 7");
+        setText(player.turn, active ? "AT TABLE" : tied ? "DRAW" : state.phase === "gameover" && winner === index ? "WINNER" : "WAITING");
+
+        if (variant === "snooker") {
+          setText(player.group, "SCORE");
+          setText(player.count, `${scores[index]} PTS`);
+        } else if (variant === "nineball") {
+          setText(player.group, "");
+          setText(player.count, "");
+        } else {
+          setText(player.group, group ? `${group === "solid" ? "SOLIDS" : "STRIPES"} · ${remaining} LEFT` : "OPEN TABLE");
+          setText(player.count, group ? `${7 - remaining} / 7 DOWN` : "— / 7");
+        }
         paintRack(player, group, balls);
       });
 
@@ -249,7 +330,7 @@ export function createUI(handlers = {}) {
       elements.turnPill.classList.toggle("is-rolling", state.phase === "rolling");
       if (state.phase === "gameover") {
         setText(elements.turnLabel, "MATCH COMPLETE");
-        setText(elements.contextHint, "Rack them up and play again");
+        setText(elements.contextHint, "Start a new game and play again");
       } else if (state.phase === "rolling") {
         setText(elements.turnLabel, "BALLS IN MOTION");
         setText(elements.contextHint, "Let the table settle");
@@ -286,20 +367,24 @@ export function createUI(handlers = {}) {
       } else if (state.phase === "rolling") {
         setText(elements.shotStatus, "Wait for every ball to settle.");
       } else if (state.phase === "gameover") {
-        setText(elements.shotStatus, "Match complete. Rack up for another game.");
+        setText(elements.shotStatus, "Match complete. Start another game when ready.");
       } else if (!isHuman) {
         setText(elements.shotStatus, "CPU is calculating the angles…");
       } else {
         setText(elements.shotStatus, "Ready when you are.");
       }
 
-      const hasWinner = state.phase === "gameover";
-      elements.winnerOverlay.hidden = !hasWinner;
-      if (hasWinner) {
-        const winner = state.winner === 0 || state.winner === 1 ? state.winner : null;
-        const winnerName = winner === null ? "MATCH OVER" : `${playerStates[winner]?.name || `PLAYER ${winner + 1}`} WINS`;
+      const matchComplete = state.phase === "gameover";
+      elements.winnerOverlay.hidden = !matchComplete;
+      if (matchComplete) {
+        const winnerName = tied ? "ALL SQUARE" : `${playerStates[winner]?.name || `PLAYER ${winner + 1}`} WINS`;
+        const tieDetail = variant === "snooker"
+          ? `${scores[0]} — ${scores[1]}. Honours even at the Blackball club.`
+          : "Honours even at the Blackball club.";
+        setText(elements.winnerBall, tied ? "—" : details.symbol);
+        elements.winnerBall.classList.toggle("is-tie", tied);
         setText(elements.winnerTitle, winnerName.toUpperCase());
-        setText(elements.winnerDetail, state.message || "A fine finish at the Blackball club.");
+        setText(elements.winnerDetail, state.message || (tied ? tieDetail : "A fine finish at the Blackball club."));
       }
     },
 

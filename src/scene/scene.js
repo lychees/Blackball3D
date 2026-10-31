@@ -11,6 +11,17 @@ const BALL_COLORS = [
   '#171a1c', '#e7bd22', '#245fbd', '#c83932', '#75489c', '#df7928', '#24734d', '#7b1f2b',
 ];
 
+const SNOOKER_COLORS = {
+  cue: '#f4f0dc',
+  red: '#b91f2e',
+  yellow: '#e7bd22',
+  green: '#176b45',
+  brown: '#75452e',
+  blue: '#245fbd',
+  pink: '#e58ca5',
+  black: '#171a1c',
+};
+
 const clamp = THREE.MathUtils.clamp;
 
 export function createTableScene(container, game) {
@@ -240,6 +251,37 @@ export function createTableScene(container, game) {
   cloth.receiveShadow = true;
   table.add(cloth);
 
+  const snookerMarkings = new THREE.Group();
+  snookerMarkings.visible = false;
+  table.add(snookerMarkings);
+  const markingMaterial = new THREE.LineBasicMaterial({
+    color: '#d8e6d8',
+    transparent: true,
+    opacity: 0.58,
+    depthWrite: false,
+  });
+  const baulkZ = TABLE_LENGTH * 0.32;
+  const baulkLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-TABLE_WIDTH / 2, 0.007, baulkZ),
+      new THREE.Vector3(TABLE_WIDTH / 2, 0.007, baulkZ),
+    ]),
+    markingMaterial,
+  );
+  snookerMarkings.add(baulkLine);
+  const dRadius = TABLE_WIDTH * 0.18;
+  const dPoints = [];
+  for (let i = 0; i <= 48; i += 1) {
+    const angle = (i / 48) * Math.PI;
+    dPoints.push(new THREE.Vector3(
+      Math.cos(angle) * dRadius,
+      0.007,
+      baulkZ + Math.sin(angle) * dRadius,
+    ));
+  }
+  const dLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(dPoints), markingMaterial);
+  snookerMarkings.add(dLine);
+
   const railWidth = 0.25;
   const railHeight = 0.24;
   const railY = 0.065;
@@ -332,16 +374,18 @@ export function createTableScene(container, game) {
     }
   }
 
-  const ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 40, 28);
+  const ballGeometry = new THREE.SphereGeometry(1, 40, 28);
   const ballVisuals = new Map();
   const rollAxis = new THREE.Vector3();
+  let ballRadius = BALL_RADIUS;
 
-  function makeBallTexture(number, kind) {
+  function makeBallTexture(number, kind, variant) {
     return canvasTexture(1024, 512, (ctx, width, height) => {
-      const color = BALL_COLORS[number] || '#dddddd';
-      ctx.fillStyle = kind === 'stripe' ? '#eee9d8' : color;
+      const color = (variant === 'snooker' ? SNOOKER_COLORS[kind] : BALL_COLORS[number]) || '#dddddd';
+      const striped = variant !== 'snooker' && (kind === 'stripe' || (variant === 'nineball' && number === 9));
+      ctx.fillStyle = striped ? '#eee9d8' : color;
       ctx.fillRect(0, 0, width, height);
-      if (kind === 'stripe') {
+      if (striped) {
         const stripe = ctx.createLinearGradient(0, height * 0.25, 0, height * 0.75);
         stripe.addColorStop(0, color);
         stripe.addColorStop(0.5, color);
@@ -358,6 +402,7 @@ export function createTableScene(container, game) {
         }
         return;
       }
+      if (variant === 'snooker') return;
       for (const [u, v] of [[0.25, 0.36], [0.75, 0.36], [0.25, 0.64], [0.75, 0.64]]) {
         const x = u * width;
         const y = v * height;
@@ -378,11 +423,11 @@ export function createTableScene(container, game) {
     });
   }
 
-  function createBallVisual(ball) {
+  function createBallVisual(ball, variant, radius) {
     const root = new THREE.Group();
     const rolling = new THREE.Group();
     root.add(rolling);
-    const texture = makeBallTexture(ball.number, ball.kind);
+    const texture = makeBallTexture(ball.number, ball.kind, variant);
     const material = new THREE.MeshPhysicalMaterial({
       map: texture,
       roughness: 0.2,
@@ -391,20 +436,27 @@ export function createTableScene(container, game) {
       clearcoatRoughness: 0.14,
     });
     const sphere = new THREE.Mesh(ballGeometry, material);
+    sphere.scale.setScalar(radius);
     sphere.castShadow = true;
     sphere.receiveShadow = true;
     rolling.add(sphere);
     if (ball.kind !== 'cue') {
-      rolling.rotation.set(ball.number * 0.17, ball.number * 0.71, ball.number * 0.09);
+      const number = Number.isFinite(ball.number) ? ball.number : 0;
+      rolling.rotation.set(number * 0.17, number * 0.71, number * 0.09);
     }
-    root.position.set(ball.x, BALL_RADIUS, ball.z);
+    root.position.set(
+      Number.isFinite(ball.x) ? ball.x : 0,
+      radius,
+      Number.isFinite(ball.z) ? ball.z : 0,
+    );
     scene.add(root);
     const visual = {
       root,
       rolling,
       sphere,
-      lastX: ball.x,
-      lastZ: ball.z,
+      number: ball.number,
+      kind: ball.kind,
+      variant,
       spinDot: null,
     };
     if (ball.kind === 'cue') {
@@ -416,12 +468,23 @@ export function createTableScene(container, game) {
         depthWrite: false,
       });
       const spinDot = new THREE.Mesh(new THREE.CircleGeometry(0.012, 24), spinMaterial);
+      spinDot.scale.setScalar(radius / BALL_RADIUS);
       spinDot.visible = false;
       root.add(spinDot);
       visual.spinDot = spinDot;
     }
     ballVisuals.set(ball.id, visual);
     return visual;
+  }
+
+  function disposeBallVisual(visual) {
+    scene.remove(visual.root);
+    visual.sphere.material.map?.dispose();
+    visual.sphere.material.dispose();
+    if (visual.spinDot) {
+      visual.spinDot.geometry.dispose();
+      visual.spinDot.material.dispose();
+    }
   }
 
   const aimGroup = new THREE.Group();
@@ -532,49 +595,70 @@ export function createTableScene(container, game) {
 
   function updateBalls(dt) {
     const state = game.state || {};
+    const variant = state.variant === 'nineball' || state.variant === 'snooker' ? state.variant : 'eightball';
     const balls = Array.isArray(state.balls) ? state.balls : [];
+    ballRadius = Number.isFinite(state.ballRadius) && state.ballRadius > 0 ? state.ballRadius : BALL_RADIUS;
+    snookerMarkings.visible = variant === 'snooker';
     const liveIds = new Set();
     for (const ball of balls) {
       liveIds.add(ball.id);
-      const visual = ballVisuals.get(ball.id) || createBallVisual(ball);
+      let visual = ballVisuals.get(ball.id);
+      if (visual && (visual.number !== ball.number || visual.kind !== ball.kind || visual.variant !== variant)) {
+        disposeBallVisual(visual);
+        ballVisuals.delete(ball.id);
+        visual = null;
+      }
+      visual = visual || createBallVisual(ball, variant, ballRadius);
+      visual.sphere.scale.setScalar(ballRadius);
+      visual.spinDot?.scale.setScalar(ballRadius / BALL_RADIUS);
       const active = ball.active !== false && !ball.pocketed;
       visual.root.visible = active;
-      if (!active) continue;
 
       const targetX = Number.isFinite(ball.x) ? ball.x : 0;
       const targetZ = Number.isFinite(ball.z) ? ball.z : 0;
+      if (!active) {
+        visual.root.position.set(targetX, ballRadius, targetZ);
+        continue;
+      }
+
       const follow = 1 - Math.exp(-Math.max(0.001, dt) * 32);
       const oldX = visual.root.position.x;
       const oldZ = visual.root.position.z;
-      visual.root.position.x += (targetX - visual.root.position.x) * follow;
-      visual.root.position.z += (targetZ - visual.root.position.z) * follow;
-      visual.root.position.y = BALL_RADIUS;
+      if (Math.hypot(targetX - oldX, targetZ - oldZ) > ballRadius * 8) {
+        visual.root.position.x = targetX;
+        visual.root.position.z = targetZ;
+      } else {
+        visual.root.position.x += (targetX - oldX) * follow;
+        visual.root.position.z += (targetZ - oldZ) * follow;
+      }
+      visual.root.position.y = ballRadius;
 
       const dx = visual.root.position.x - oldX;
       const dz = visual.root.position.z - oldZ;
       const distance = Math.hypot(dx, dz);
-      if (distance > 0.000001 && distance < BALL_RADIUS * 4) {
+      if (distance > 0.000001 && distance < ballRadius * 4) {
         rollAxis.set(dz, 0, -dx).normalize();
-        visual.rolling.rotateOnWorldAxis(rollAxis, distance / BALL_RADIUS);
+        visual.rolling.rotateOnWorldAxis(rollAxis, distance / ballRadius);
       }
-      visual.lastX = targetX;
-      visual.lastZ = targetZ;
     }
     for (const [id, visual] of ballVisuals) {
-      if (!liveIds.has(id)) visual.root.visible = false;
+      if (!liveIds.has(id)) {
+        disposeBallVisual(visual);
+        ballVisuals.delete(id);
+      }
     }
   }
 
   function firstAimContact(cue, balls, dx, dz) {
     let distance = 12;
     let hitBall = null;
-    const xLimit = TABLE_WIDTH / 2 - BALL_RADIUS;
-    const zLimit = TABLE_LENGTH / 2 - BALL_RADIUS;
+    const xLimit = TABLE_WIDTH / 2 - ballRadius;
+    const zLimit = TABLE_LENGTH / 2 - ballRadius;
     if (dx > 0.00001) distance = Math.min(distance, (xLimit - cue.x) / dx);
     if (dx < -0.00001) distance = Math.min(distance, (-xLimit - cue.x) / dx);
     if (dz > 0.00001) distance = Math.min(distance, (zLimit - cue.z) / dz);
     if (dz < -0.00001) distance = Math.min(distance, (-zLimit - cue.z) / dz);
-    distance = Math.max(BALL_RADIUS, distance);
+    distance = Math.max(ballRadius, distance);
 
     rayDirection.set(dx, dz);
     for (const ball of balls) {
@@ -583,7 +667,7 @@ export function createTableScene(container, game) {
       const projection = toBall.dot(rayDirection);
       if (projection <= 0 || projection >= distance) continue;
       const perpendicularSq = toBall.lengthSq() - projection * projection;
-      const contactRadius = BALL_RADIUS * 2.04;
+      const contactRadius = ballRadius * 2.04;
       if (perpendicularSq > contactRadius * contactRadius) continue;
       const contactDistance = projection - Math.sqrt(Math.max(0, contactRadius * contactRadius - perpendicularSq));
       if (contactDistance > 0 && contactDistance < distance) {
@@ -600,9 +684,12 @@ export function createTableScene(container, game) {
     const cue = balls.find((ball) => ball.kind === 'cue' || ball.number === 0);
     const aiming = state.phase === 'aiming' && cue && cue.active !== false && !cue.pocketed;
     const cueVisual = cue ? ballVisuals.get(cue.id) : null;
+    const radiusRatio = ballRadius / BALL_RADIUS;
     aimGroup.visible = Boolean(aiming);
     ghostRing.visible = false;
     objectRing.visible = false;
+    ghostRing.scale.setScalar(radiusRatio);
+    objectRing.scale.setScalar(radiusRatio);
     if (!aiming) {
       if (cueVisual?.spinDot) cueVisual.spinDot.visible = false;
       return;
@@ -619,10 +706,13 @@ export function createTableScene(container, game) {
     aimGroup.position.set(cue.x, 0, cue.z);
     aimGroup.rotation.y = Math.atan2(dx, dz);
     cueGroup.position.z = -cuePull;
+    cueShaft.position.set(0, ballRadius * 1.08, -(ballRadius + 0.07 + cueLength / 2));
+    cueTip.position.set(0, ballRadius * 1.08, -(ballRadius + 0.07 + 0.0325));
+    grip.position.set(0, ballRadius * 1.08, -(ballRadius + 0.07 + cueLength - 0.2));
 
     const contact = firstAimContact(cue, balls, dx, dz);
-    const start = BALL_RADIUS * 1.18;
-    const end = Math.max(start + 0.01, contact.distance - (contact.hitBall ? BALL_RADIUS * 0.85 : 0));
+    const start = ballRadius * 1.18;
+    const end = Math.max(start + 0.01, contact.distance - (contact.hitBall ? ballRadius * 0.85 : 0));
     const length = end - start;
     const positions = aimLineGeometry.attributes.position;
     positions.setXYZ(0, 0, 0.025, start);
@@ -641,7 +731,7 @@ export function createTableScene(container, game) {
     powerRing.material.color.setHSL(hue, 0.7, 0.62);
     powerRing.material.opacity = charging ? 0.45 + power * 0.35 : 0.18;
     const ringScale = charging ? 1 + Math.sin(elapsed * 8) * 0.055 + power * 0.12 : 1;
-    powerRing.scale.setScalar(ringScale);
+    powerRing.scale.setScalar(ringScale * radiusRatio);
 
     if (contact.hitBall) {
       ghostRing.visible = true;
@@ -653,9 +743,9 @@ export function createTableScene(container, game) {
     if (cueVisual?.spinDot) {
       const spinX = clamp(Number.isFinite(state.spin?.x) ? state.spin.x : 0, -1, 1);
       const spinY = clamp(Number.isFinite(state.spin?.y) ? state.spin.y : 0, -1, 1);
-      const sx = spinX * BALL_RADIUS * 0.64;
-      const sz = spinY * BALL_RADIUS * 0.64;
-      const sy = Math.sqrt(Math.max(0.0001, BALL_RADIUS * BALL_RADIUS - sx * sx - sz * sz));
+      const sx = spinX * ballRadius * 0.64;
+      const sz = spinY * ballRadius * 0.64;
+      const sy = Math.sqrt(Math.max(0.0001, ballRadius * ballRadius - sx * sx - sz * sz));
       cueVisual.spinDot.position.set(sx, sy + 0.0008, sz);
       cueVisual.spinDot.quaternion.setFromUnitVectors(
         new THREE.Vector3(0, 0, 1),
@@ -803,6 +893,7 @@ export function createTableScene(container, game) {
     const materials = new Set();
     const textures = new Set();
     scene.traverse((object) => {
+      object.shadow?.dispose();
       if (object.geometry) geometries.add(object.geometry);
       if (object.material) {
         for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
